@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page {
+    size: A4;
+    margin: 2.5cm 2cm 3cm 2cm;
+    @top-center {
+      content: "CONFIDENTIAL — NEXUS BANK LIMITED";
+      font-size: 7pt;
+      color: #999;
+      font-family: 'Helvetica', sans-serif;
+    }
+    @bottom-left {
+      content: "Case Ref: {{ case_number }}";
+      font-size: 7pt;
+      color: #999;
+    }
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-size: 7pt;
+      color: #999;
+    }
+  }
+  @page :first {
+    @top-center { content: none; }
+    @bottom-left { content: none; }
+    @bottom-right { content: none; }
+  }
+  body {
+    font-family: 'Helvetica', 'Arial', sans-serif;
+    font-size: 10pt;
+    line-height: 1.6;
+    color: #1a1a1a;
+  }
+  h1 { font-size: 20pt; color: #0a2463; margin-bottom: 4pt; }
+  h2 { font-size: 14pt; color: #0a2463; border-bottom: 2px solid #0a2463; padding-bottom: 4pt; margin-top: 28pt; }
+  h3 { font-size: 12pt; color: #1e3a5f; margin-top: 18pt; }
+  p { text-align: justify; margin-bottom: 8pt; }
+
+  .cover-page {
+    text-align: center;
+    padding-top: 100px;
+    page-break-after: always;
+  }
+  .cover-page .bank-name {
+    font-size: 28pt;
+    font-weight: 700;
+    color: #0a2463;
+    letter-spacing: 3pt;
+  }
+  .cover-page .doc-title {
+    font-size: 18pt;
+    color: #333;
+    margin-top: 20px;
+    letter-spacing: 1pt;
+  }
+  .cover-page .company-name {
+    font-size: 22pt;
+    font-weight: 700;
+    color: #0a2463;
+    margin-top: 60px;
+  }
+  .cover-page .meta-info {
+    margin-top: 40px;
+    font-size: 10pt;
+    color: #555;
+  }
+  .cover-page .meta-info td {
+    padding: 4px 12px;
+    text-align: left;
+  }
+  .cover-page .meta-info td:first-child {
+    font-weight: 700;
+    color: #333;
+  }
+  .cover-page .confidential {
+    margin-top: 80px;
+    font-size: 9pt;
+    color: #c70000;
+    letter-spacing: 2pt;
+    font-weight: 700;
+  }
+
+  .watermark {
+    position: fixed;
+    top: 40%;
+    left: 15%;
+    font-size: 80pt;
+    color: rgba(200,200,200,0.08);
+    transform: rotate(-45deg);
+    z-index: -1;
+    font-weight: 900;
+    letter-spacing: 10pt;
+  }
+
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12pt 0;
+    font-size: 9pt;
+  }
+  table.data-table th {
+    background-color: #0a2463;
+    color: white;
+    padding: 6pt 8pt;
+    text-align: left;
+    font-weight: 600;
+  }
+  table.data-table td {
+    padding: 5pt 8pt;
+    border-bottom: 1px solid #ddd;
+  }
+  table.data-table tr:nth-child(even) td {
+    background-color: #f7f9fc;
+  }
+  table.data-table .number {
+    text-align: right;
+    font-family: 'Courier New', monospace;
+  }
+
+  .decision-box {
+    border: 3px solid;
+    border-radius: 8px;
+    padding: 20pt;
+    text-align: center;
+    margin: 20pt 0;
+    page-break-inside: avoid;
+  }
+  .decision-box.approve {
+    border-color: #00a651;
+    background-color: #f0fff4;
+  }
+  .decision-box.conditional {
+    border-color: #ffb800;
+    background-color: #fffbeb;
+  }
+  .decision-box.decline {
+    border-color: #e53935;
+    background-color: #fff5f5;
+  }
+  .decision-box .decision-text {
+    font-size: 22pt;
+    font-weight: 900;
+    margin-bottom: 8pt;
+  }
+  .decision-box.approve .decision-text { color: #00a651; }
+  .decision-box.conditional .decision-text { color: #ffb800; }
+  .decision-box.decline .decision-text { color: #e53935; }
+  .decision-box .decision-details {
+    font-size: 11pt;
+    color: #333;
+  }
+
+  .metrics-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12pt;
+    margin: 16pt 0;
+  }
+  .metric-card {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 10pt 14pt;
+    width: 30%;
+    page-break-inside: avoid;
+  }
+  .metric-card .label { font-size: 8pt; color: #666; text-transform: uppercase; }
+  .metric-card .value { font-size: 16pt; font-weight: 700; color: #0a2463; }
+
+  .ews-table td.red { background-color: #ffe0e0; color: #c62828; font-weight: 700; }
+  .ews-table td.amber { background-color: #fff3cd; color: #e65100; font-weight: 700; }
+  .ews-table td.green { background-color: #e8f5e9; color: #2e7d32; font-weight: 700; }
+
+  .section-number { color: #0a2463; font-weight: 700; }
+  .toc { page-break-after: always; }
+  .toc h2 { border-bottom: none; }
+  .toc ul { list-style: none; padding: 0; }
+  .toc li {
+    padding: 6pt 0;
+    border-bottom: 1px dotted #ccc;
+    font-size: 11pt;
+  }
+  .toc li span.page { float: right; }
+
+  .signature-block {
+    margin-top: 60pt;
+    page-break-inside: avoid;
+  }
+  .signature-block table {
+    width: 100%;
+    border: none;
+  }
+  .signature-block td {
+    width: 33%;
+    text-align: center;
+    padding-top: 40pt;
+    vertical-align: top;
+  }
+  .signature-block .sig-line {
+    border-top: 1px solid #333;
+    margin: 0 20pt;
+    padding-top: 4pt;
+    font-size: 9pt;
+    color: #555;
+  }
+
+  .cam-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10pt 0;
+    font-size: 9pt;
+  }
+  .cam-content table th {
+    background: #0a2463;
+    color: white;
+    padding: 5pt 8pt;
+    text-align: left;
+  }
+  .cam-content table td {
+    padding: 4pt 8pt;
+    border-bottom: 1px solid #ddd;
+  }
+  .cam-content strong { color: #0a2463; }
+</style>
+</head>
+<body>
+<div class="watermark">CONFIDENTIAL</div>
+
+<!-- COVER PAGE -->
+<div class="cover-page">
+  <div class="bank-name">NEXUS BANK LIMITED</div>
+  <div class="doc-title">CREDIT APPRAISAL MEMORANDUM</div>
+  <div class="company-name">{{ company_name }}</div>
+  <table class="meta-info" style="margin: 40px auto;">
+    <tr><td>Case Reference</td><td>{{ case_number }}</td></tr>
+    <tr><td>Date of Appraisal</td><td>{{ appraisal_date }}</td></tr>
+    <tr><td>Facility Type</td><td>{{ loan_type }}</td></tr>
+    <tr><td>Amount Requested</td><td>₹{{ requested_amount_formatted }}</td></tr>
+    <tr><td>Industry</td><td>{{ industry }}</td></tr>
+    <tr><td>CIN</td><td>{{ cin }}</td></tr>
+  </table>
+  <div class="confidential">— STRICTLY CONFIDENTIAL —</div>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ul>
+    <li><span class="section-number">1.0</span> Executive Summary</li>
+    <li><span class="section-number">2.0</span> Company Background</li>
+    <li><span class="section-number">3.0</span> Industry &amp; Market Analysis</li>
+    <li><span class="section-number">4.0</span> Financial Analysis</li>
+    <li><span class="section-number">5.0</span> Banking Conduct</li>
+    <li><span class="section-number">6.0</span> Collateral Assessment</li>
+    <li><span class="section-number">7.0</span> Risk Assessment</li>
+    <li><span class="section-number">8.0</span> Credit Decision</li>
+    <li><span class="section-number">9.0</span> Covenants &amp; Conditions</li>
+    <li><span class="section-number">10.0</span> Appendices</li>
+  </ul>
+</div>
+
+<!-- DECISION BOX -->
+{% set decision_class = 'approve' if decision == 'APPROVE' else ('conditional' if decision == 'CONDITIONAL' else 'decline') %}
+<div class="decision-box {{ decision_class }}">
+  <div class="decision-text">{{ decision }}</div>
+  <div class="decision-details">
+    {% if decision == 'APPROVE' %}
+      Recommended Limit: ₹{{ recommended_limit_formatted }} | Rate: {{ recommended_rate }}% p.a. | Grade: {{ credit_grade }}
+    {% elif decision == 'CONDITIONAL' %}
+      Conditionally Recommended: ₹{{ recommended_limit_formatted }} | Rate: {{ recommended_rate }}% p.a. | Grade: {{ credit_grade }} | Subject to conditions in Section 9
+    {% else %}
+      Application declined based on credit assessment. See Section 7 for risk details.
+    {% endif %}
+  </div>
+</div>
+
+<!-- KEY METRICS -->
+<div class="metrics-grid">
+  <div class="metric-card"><div class="label">Credit Score</div><div class="value">{{ credit_score }}</div></div>
+  <div class="metric-card"><div class="label">PD Score</div><div class="value">{{ pd_score }}%</div></div>
+  <div class="metric-card"><div class="label">Expected Loss</div><div class="value">₹{{ expected_loss_formatted }}</div></div>
+  <div class="metric-card"><div class="label">Credit Grade</div><div class="value">{{ credit_grade }}</div></div>
+  <div class="metric-card"><div class="label">DSCR (Latest)</div><div class="value">{{ dscr_latest }}x</div></div>
+  <div class="metric-card"><div class="label">Debt/Equity</div><div class="value">{{ de_ratio }}x</div></div>
+</div>
+
+<!-- CAM SECTIONS -->
+{% for section in sections %}
+<div class="cam-content" style="page-break-before: always;">
+  <h2><span class="section-number">{{ section.number }}</span> {{ section.title }}</h2>
+  {{ section.content | safe }}
+</div>
+{% endfor %}
+
+<!-- EWS TABLE -->
+{% if ews_signals %}
+<div style="page-break-before: always;">
+  <h2>Early Warning Signals</h2>
+  <table class="data-table ews-table">
+    <thead><tr><th>Signal</th><th>Severity</th><th>Description</th><th>Triggered By</th></tr></thead>
+    <tbody>
+    {% for ews in ews_signals %}
+      <tr>
+        <td>{{ ews.signal_type }}</td>
+        <td class="{{ ews.severity | lower }}">{{ ews.severity }}</td>
+        <td>{{ ews.description }}</td>
+        <td>{{ ews.triggered_by }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- FINANCIAL SPREADS TABLE -->
+{% if financial_spreads %}
+<div style="page-break-before: always;">
+  <h2>Appendix A: Financial Spreads (5-Year)</h2>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        {% for year in spread_years %}<th class="number">{{ year }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in financial_spreads %}
+      <tr>
+        <td><strong>{{ row.metric }}</strong></td>
+        {% for val in row.values %}<td class="number">{{ val }}</td>{% endfor %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- SHAP TABLE -->
+{% if shap_features %}
+<div>
+  <h2>Appendix B: AI Model Feature Importance (SHAP)</h2>
+  <table class="data-table">
+    <thead><tr><th>Feature</th><th class="number">Value</th><th class="number">SHAP Impact</th><th>Direction</th></tr></thead>
+    <tbody>
+    {% for f in shap_features %}
+      <tr>
+        <td>{{ f.feature }}</td>
+        <td class="number">{{ f.value }}</td>
+        <td class="number">{{ f.shap_value }}</td>
+        <td>{{ '↑ Risk' if f.direction == 'positive' else '↓ Risk' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- SIGNATURE BLOCK -->
+<div class="signature-block">
+  <table>
+    <tr>
+      <td>
+        <div class="sig-line">
+          Prepared by: AI Credit Engine<br>NEXUS CREDIT v1.0<br>{{ appraisal_date }}
+        </div>
+      </td>
+      <td>
+        <div class="sig-line">
+          Reviewed by:<br>[Credit Analyst]<br>Date: ___________
+        </div>
+      </td>
+      <td>
+        <div class="sig-line">
+          Approved by:<br>[Senior Credit Manager]<br>Date: ___________
+        </div>
+      </td>
+    </tr>
+  </table>
+</div>
+
+</body>
+</html>
