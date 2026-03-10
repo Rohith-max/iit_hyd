@@ -1,4 +1,4 @@
-"""CAM Writer Agent — generates full Credit Appraisal Memo section by section using Claude."""
+"""CAM Writer Agent — generates full Credit Appraisal Memo section by section using Groq LLM."""
 import time
 import asyncio
 import logging
@@ -19,17 +19,26 @@ Write in formal British English as used in Indian banking. Be concise but compre
 IMPORTANT: Output plain text only. Do NOT use markdown, headers (#), bold (**), tables (|---|), bullet lists with dashes/asterisks, or any other formatting. Use line breaks and spacing for structure."""
 
 CAM_SECTION_PROMPTS = {
-    "executive_summary": """Write the Executive Summary section of a Credit Appraisal Memo.
+    "executive_summary": """Write a detailed Executive Summary section of a Credit Appraisal Memo.
 Decision: {decision}
 Company: {company_name}
-Loan Request: {loan_type} of ₹{requested_amount_cr:.2f} Crore for {tenure} months
+Loan Request: {loan_type} of Rs {requested_amount_cr:.2f} Crore for {tenure} months
 Credit Grade: {credit_grade} | PD: {pd_score:.4f} | DSCR: {dscr:.2f}x | D/E: {de:.2f}x
-Recommended Limit: ₹{recommended_limit_cr:.2f} Crore at {rate:.2f}%
+Recommended Limit: Rs {recommended_limit_cr:.2f} Crore at {rate:.2f}%
 Confidence: {confidence:.1%}
 
-Include a concise 200-word summary with the decision upfront, followed by key metrics listed one per line.""",
+You MUST cover ALL of the following:
+1. Decision and rationale (why approve/decline/conditional — cite the specific financial metrics driving the decision)
+2. Key metrics summary with your professional assessment of each metric
+3. Key strengths identified in the analysis (at least 3 with specific evidence)
+4. Key concerns and risk factors (at least 2 with specific data points)
+5. Strategic insights: what this loan means for the borrower's growth trajectory
+6. Actionable recommendations: what the borrower should focus on to strengthen their credit profile
+7. Suggested conditions or watch-items even if approved
 
-    "company_background": """Write the Company Background section.
+Write 400-500 words. Be analytical, not just descriptive.""",
+
+    "company_background": """Write a detailed Company Background section.
 Company: {company_name}
 CIN: {cin}
 Incorporated: {date_of_incorporation}
@@ -39,9 +48,17 @@ Promoter Holding: {promoter_holding_pct:.0f}%
 Directors: {directors}
 Registered Address: {registered_address}
 
-Cover: business model, history, promoter profile, group structure.""",
+You MUST cover ALL of the following:
+1. Company overview: business model, products/services, market positioning
+2. Promoter profile: experience, track record, and assessment of management quality
+3. Corporate governance assessment: board composition, promoter holding adequacy, key person risk
+4. Group structure and related party exposure analysis
+5. Operational insights: what the years in operation and industry position tell us about business stability
+6. Suggestions: what governance or structural improvements would strengthen the company's creditworthiness
 
-    "industry_analysis": """Write the Industry & Market Analysis section.
+Write 300-400 words.""",
+
+    "industry_analysis": """Write a detailed Industry & Market Analysis section.
 Industry Code: {industry_code}
 Sector Outlook: {sector_outlook}
 Industry Growth: {industry_growth_rate:.1%}
@@ -50,9 +67,19 @@ Key Risks: {key_risks}
 Growth Drivers: {growth_drivers}
 Market Size: {market_size}
 
-Cover: sector overview, competitive positioning, tailwinds/headwinds, brief Porter's 5 forces.""",
+You MUST cover ALL of the following:
+1. Sector overview with current market dynamics and size assessment
+2. Growth trajectory analysis: what the growth rate means for the borrower specifically
+3. NPA rate interpretation: how the industry NPA rate compares to banking sector norms and what it implies
+4. Competitive landscape and the borrower's positioning within it
+5. Key headwinds and tailwinds with impact assessment (high/medium/low)
+6. Regulatory and policy environment affecting the sector
+7. Insights: how industry trends specifically affect THIS borrower's repayment capacity
+8. Recommendations: how the borrower can position themselves to benefit from industry tailwinds and hedge against risks
 
-    "financial_analysis": """Write the Financial Analysis section.
+Write 350-450 words.""",
+
+    "financial_analysis": """Write a detailed Financial Analysis section.
 5-Year Financial Summary:
 {financial_table}
 
@@ -67,27 +94,56 @@ Altman Z: {altman_z:.2f}
 Anomalies detected: {anomalies}
 Peer comparison: {peer_summary}
 
-Cover: 5-year trends, ratio analysis, cash flow quality, working capital analysis, peer comparison. List ratios one per line.""",
+You MUST cover ALL of the following:
+1. Revenue and profitability trend analysis over 5 years: growth rate, margin expansion/contraction, sustainability assessment
+2. Each key ratio with: current value, trend direction, peer benchmark comparison, and whether it is a strength or concern
+3. Working capital analysis: what current ratio and utilization patterns tell us about operational efficiency
+4. Debt servicing capacity: detailed DSCR analysis with 3-year trend and adequacy assessment
+5. Altman Z-Score interpretation: which zone, what it means for default probability, and how it aligns with the ML PD score
+6. Anomaly flags: explain each anomaly detected and its significance
+7. Peer comparison insights: where the company outperforms and underperforms vs industry median
+8. Financial health improvement recommendations: specific, actionable steps the borrower should take (e.g., reduce debtors cycle, improve EBITDA margin by X, reduce leverage)
+9. Cash flow quality assessment and sustainability of earnings
 
-    "banking_conduct": """Write the Banking Conduct section.
+Write 500-600 words. Use specific numbers.""",
+
+    "banking_conduct": """Write a detailed Banking Conduct section.
 CIBIL Score: {cibil_score}
 DPD History: 0-DPD: {dpd_0}, 30-DPD: {dpd_30}, 60-DPD: {dpd_60}, 90-DPD: {dpd_90}
 Existing Utilization: {utilization:.0%}
 Loan Enquiries (6M): {enquiries}
 Existing Charges: {charges}
 
-Cover: account conduct, existing facilities, utilization patterns.""",
+You MUST cover ALL of the following:
+1. CIBIL score assessment: what this score means, how it compares to bank's threshold, and trend implication
+2. DPD history analysis: payment discipline assessment, any patterns of stress, and what the 0-DPD months indicate about regularity
+3. Facility utilization analysis: whether the utilization level suggests healthy usage, over-dependence, or underutilization
+4. Loan enquiry assessment: whether 6-month enquiry count signals credit hunger or normal course of business
+5. Existing charges and their implications for new lending
+6. Overall banking relationship quality rating
+7. Profile improvement suggestions: specific actions to improve CIBIL score, reduce DPD instances, and optimise utilization
 
-    "collateral_assessment": """Write the Collateral Assessment section.
+Write 300-400 words.""",
+
+    "collateral_assessment": """Write a detailed Collateral Assessment section.
 Collateral Type: {collateral_type}
 LTV Ratio: {ltv:.0%}
 Coverage Ratio: {coverage:.2f}x
 SARFAESI Applicable: {sarfaesi}
-Collateral Value: ₹{collateral_value_cr:.2f} Crore
+Collateral Value: Rs {collateral_value_cr:.2f} Crore
 
-Cover: collateral details, LTV, enforceability, SARFAESI applicability.""",
+You MUST cover ALL of the following:
+1. Collateral description and quality assessment
+2. LTV ratio analysis: adequacy vs bank norms (typically 60-75%), and risk buffer available
+3. Coverage ratio analysis: whether the coverage provides sufficient cushion for the recommended limit
+4. SARFAESI enforceability: practical assessment of recovery prospects
+5. Valuation methodology and potential risks (market volatility, depreciation, encumbrance)
+6. Recommendations: additional collateral or guarantees that could strengthen the security package
+7. Suggestions for the borrower to improve their collateral position (e.g., provide additional security, get fresh valuation)
 
-    "risk_assessment": """Write the Risk Assessment section.
+Write 250-350 words.""",
+
+    "risk_assessment": """Write a detailed Risk Assessment section.
 PD Model Output: {pd_score:.4f} (Grade: {credit_grade})
 Altman Z-Score: {altman_z:.2f} ({z_zone})
 Piotroski F-Score: {f_score:.0f}/9
@@ -99,30 +155,54 @@ Risk Radar Scores (0-10): Financial: {radar_financial}, Business: {radar_busines
 
 EWS Triggers: {ews_summary}
 
-Cover: ML model interpretation, key risk factors with mitigants, EWS analysis.""",
+You MUST cover ALL of the following:
+1. ML model interpretation: what the PD score and credit grade mean in practical terms (expected defaults per 1000 accounts)
+2. Multi-model cross-validation: compare Altman Z, Piotroski F, Beneish M, and ML PD — do they agree or conflict? What does convergence/divergence tell us?
+3. SHAP feature analysis: which factors are driving risk UP and which are driving it DOWN, and what the borrower can control
+4. Risk radar analysis: identify the weakest and strongest dimensions, and explain why
+5. Early Warning Signal analysis: significance of each triggered signal, urgency level, and recommended monitoring actions
+6. Risk mitigants: existing factors that offset identified risks
+7. Residual risks: risks that remain unmitigated and their potential impact
+8. Risk reduction roadmap: specific, prioritised actions the borrower should take to improve their risk profile (with expected impact)
 
-    "credit_decision": """Write the Credit Decision section.
+Write 500-600 words.""",
+
+    "credit_decision": """Write a detailed Credit Decision section.
 Decision: {decision}
-Recommended Limit: ₹{recommended_limit_cr:.2f} Crore
+Recommended Limit: Rs {recommended_limit_cr:.2f} Crore
 Pricing: MCLR ({mclr:.2f}%) + Risk Premium ({risk_premium:.2f}%) = {total_rate:.2f}%
-Expected Loss: ₹{expected_loss_lakh:.2f} Lakh ({el_pct:.2f}% of limit)
+Expected Loss: Rs {expected_loss_lakh:.2f} Lakh ({el_pct:.2f}% of limit)
 Confidence: {confidence:.1%}
 
-Cover: decision rationale, limit working, pricing rationale (RARR breakdown), tenure recommendation.""",
+You MUST cover ALL of the following:
+1. Decision rationale: detailed explanation of why this decision was reached, citing at least 5 specific data points
+2. Limit working: how the recommended limit was derived (MPBF/DSCR method) and why it may differ from the requested amount
+3. Pricing rationale: RARR (Risk Adjusted Return on Risk) breakdown, why this risk premium is appropriate for this grade
+4. Expected Loss analysis: what the EL means in terms of provisioning requirements and capital adequacy
+5. Confidence level interpretation: what the model confidence means for decision reliability
+6. Tenure recommendation with justification
+7. Conditions for improvement: what the borrower needs to achieve for a limit enhancement or rate reduction in future reviews
+8. Review schedule recommendation
 
-    "covenants": """Write the Covenants & Conditions section.
+Write 400-500 words.""",
+
+    "covenants": """Write a detailed Covenants & Conditions section.
 Credit Grade: {credit_grade}
 DSCR: {dscr:.2f}x
 D/E: {de:.2f}x
 Decision: {decision}
 
-Recommend financial covenants (DSCR > 1.25x, D/E < 3x, etc.), reporting covenants, pre-disbursement conditions, ongoing monitoring requirements.""",
+You MUST cover ALL of the following:
+1. Financial covenants: minimum DSCR (>1.25x), maximum D/E (<3x), minimum current ratio (>1.33x), promoter holding floor, dividend restriction triggers — explain WHY each threshold is set at that level based on the borrower's current position
+2. Reporting covenants: frequency and deadlines for audited financials, quarterly provisionals, stock/debtor statements, insurance renewals
+3. Pre-disbursement conditions: documentation, ROC charge creation, financials submission, board resolution
+4. Ongoing monitoring requirements: annual review, quarterly covenant compliance, half-yearly unit visits, CIBIL monitoring
+5. Event-based triggers: what happens if a covenant is breached (cure period, enhanced monitoring, recall provisions)
+6. Suggestions for the borrower: how to comfortably stay within covenant thresholds with operational buffers
 
-    "appendices": """Generate the Appendices section with:
-1. 5-Year Financial Spreads (listed one per line)
-2. Key Ratio Trends (listed one per line)
-3. Top 10 SHAP Feature Importance
-4. Data Sources List
+Write 400-500 words.""",
+
+    "appendices": """Generate a detailed Appendices section.
 
 Financial Data:
 {financial_table}
@@ -130,7 +210,15 @@ Financial Data:
 SHAP Top Features:
 {shap_features}
 
-Data Sources: DuckDB/Databricks, MCA Portal, CIBIL Bureau, News (Tavily), Industry Reports (ChromaDB RAG)""",
+You MUST include ALL of the following:
+1. 5-Year Financial Spreads: list each year's revenue, EBITDA, PAT with year-over-year growth rates and your commentary on the trend
+2. Key Ratio Trends: for each major ratio (DSCR, CR, D/E, EBITDA margin, ROE), show the trajectory and whether it is improving or deteriorating
+3. Top 10 SHAP Feature Importance: list each feature, its value, direction of impact, and a plain-English interpretation of what it means for credit risk
+4. Data Sources: DuckDB/Databricks, MCA Portal, CIBIL Bureau, Tavily News, ChromaDB RAG, SEBI/NCLT/RBI databases, XGBoost+LightGBM ML ensemble
+5. Model performance summary: training AUC-ROC, calibration metrics, and confidence interval
+6. Glossary of key banking terms used in this CAM
+
+Write 400-500 words.""",
 }
 
 
@@ -209,33 +297,38 @@ class CAMWriterAgent:
             logger.warning(f"Missing key {e} in context for {section_key}")
             prompt = prompt_template
 
-        if not settings.DEMO_MODE and settings.ANTHROPIC_API_KEY:
-            return await self._stream_claude(case_id, section_key, prompt)
+        if settings.GROQ_API_KEY:
+            return await self._stream_groq(case_id, section_key, prompt)
         else:
             return await self._generate_fallback(case_id, section_key, context)
 
-    async def _stream_claude(self, case_id: str, section_key: str, prompt: str) -> str:
-        """Stream CAM section from Claude."""
+    async def _stream_groq(self, case_id: str, section_key: str, prompt: str) -> str:
+        """Stream CAM section from Groq."""
         try:
-            import anthropic
-            client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+            from groq import AsyncGroq
+            client = AsyncGroq(api_key=settings.GROQ_API_KEY)
             full_text = ""
-            async with client.messages.stream(
-                model="claude-sonnet-4-20250514",
-                max_tokens=2000,
-                system=CAM_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": prompt}]
-            ) as stream:
-                async for text in stream.text_stream:
-                    full_text += text
+            stream = await client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                max_tokens=3000,
+                stream=True,
+                messages=[
+                    {"role": "system", "content": CAM_SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            async for chunk in stream:
+                delta = chunk.choices[0].delta.content or ""
+                if delta:
+                    full_text += delta
                     await ws_manager.broadcast(case_id, {
                         "type": "cam_stream",
                         "section": section_key,
-                        "delta": text,
+                        "delta": delta,
                     })
             return full_text
         except Exception as e:
-            logger.error(f"Claude streaming failed for {section_key}: {e}")
+            logger.error(f"Groq streaming failed for {section_key}: {e}")
             return await self._generate_fallback(case_id, section_key, {})
 
     async def _generate_fallback(self, case_id: str, section_key: str, context: dict) -> str:

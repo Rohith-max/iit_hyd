@@ -1,4 +1,4 @@
-"""Risk Assessment Agent — ML scoring, EWS generation, final risk synthesis."""
+"""Risk Assessment Agent — ML scoring, EWS generation, LLM-powered analysis, final risk synthesis."""
 import time
 import asyncio
 import logging
@@ -93,6 +93,12 @@ class RiskAssessmentAgent:
             color = "🔴" if signal["severity"] == "RED" else ("🟡" if signal["severity"] == "AMBER" else "🟢")
             await _emit(case_id, f"{color} EWS: {signal['description']}", status="warning")
 
+        # LLM-powered AI Analysis
+        await _emit(case_id, "Generating AI-powered credit analysis and suggestions...")
+        ai_analysis = await self._generate_ai_analysis(features, score_result, shap_result, ews, state)
+        state["ml_scores"]["ai_analysis"] = ai_analysis
+        await _emit(case_id, "AI analysis complete", status="step_done")
+
         elapsed = int((time.time() - start) * 1000)
         state["agent_logs"].append({
             "agent_name": "RiskAssessment",
@@ -104,6 +110,174 @@ class RiskAssessmentAgent:
         await _emit(case_id, f"Risk assessment complete ({elapsed}ms) — {score_result.decision}", status="completed")
         state["current_agent"] = "CAMWriter"
         return state
+
+    async def _generate_ai_analysis(self, features: dict, score_result, shap_result: dict, ews: list, state: dict) -> dict:
+        """Call LLM to produce a comprehensive AI credit analysis with actionable suggestions."""
+        shap_top = shap_result.get("waterfall_data", [])[:8]
+        radar = shap_result.get("feature_importances", {})
+        ews_red = [e for e in ews if e["severity"] == "RED"]
+        ews_amber = [e for e in ews if e["severity"] == "AMBER"]
+        spreads = state.get("financial_spreads", [])
+
+        # Build financial trend mini-table
+        fin_trend = ""
+        for s in spreads[-3:]:
+            rev = float(s.get("revenue", 0) or 0) / 1e7
+            ebitda = float(s.get("ebitda", 0) or 0) / 1e7
+            pat = float(s.get("pat", 0) or 0) / 1e7
+            fin_trend += f"  {s.get('fiscal_year', 'N/A')}: Revenue ₹{rev:.1f}Cr, EBITDA ₹{ebitda:.1f}Cr, PAT ₹{pat:.1f}Cr\n"
+
+        shap_desc = "\n".join(
+            f"  - {f.get('display_name', f.get('feature',''))}: value={f.get('value',0):.3f}, "
+            f"SHAP impact={f.get('shap_value',0):+.4f} ({f.get('direction','')})"
+            for f in shap_top
+        )
+
+        ews_desc = "\n".join(f"  [{e['severity']}] {e['description']}" for e in ews_red + ews_amber)
+        if not ews_desc:
+            ews_desc = "  No RED or AMBER warnings triggered."
+
+        radar_desc = ", ".join(f"{k}: {v:.1f}/10" for k, v in radar.items()) if radar else "N/A"
+
+        prompt = f"""You are a Senior Credit Analyst at a leading Indian bank. Based on the following ML-computed credit analysis data, provide a comprehensive AI Risk Analysis with actionable suggestions.
+
+COMPANY: {state.get('company_name', 'N/A')}
+LOAN: {state.get('loan_type', 'Term Loan')} of ₹{float(state.get('requested_amount', 0) or 0)/1e7:.2f} Crore
+
+ML DECISION: {score_result.decision}
+CREDIT GRADE: {score_result.credit_grade} | PD: {score_result.pd_score:.4f} | Credit Score: {score_result.credit_score}/900
+RECOMMENDED LIMIT: ₹{score_result.recommended_limit/1e7:.2f} Crore at {score_result.recommended_rate*100:.2f}%
+CONFIDENCE: {score_result.confidence:.1%} | Expected Loss: ₹{score_result.expected_loss/1e5:.2f} Lakh
+
+KEY FINANCIAL RATIOS:
+  DSCR: {features.get('dscr', 0):.2f}x | D/E: {features.get('debt_equity_ratio', 0):.2f}x | Current Ratio: {features.get('current_ratio', 0):.2f}x
+  EBITDA Margin: {features.get('ebitda_margin', 0):.1%} | ROE: {features.get('roe', 0):.1%}
+  Altman Z: {features.get('altman_z_score', 0):.2f} | Piotroski F: {features.get('piotroski_f_score', 0):.0f}/9
+  Beneish M: {features.get('beneish_m_score', 0):.2f} | CIBIL: {features.get('cibil_score', 0):.0f}
+
+FINANCIAL TREND (Last 3 Years):
+{fin_trend if fin_trend else '  N/A'}
+SHAP TOP FEATURES (driving the ML model):
+{shap_desc}
+
+RISK RADAR SCORES: {radar_desc}
+
+EARLY WARNING SIGNALS:
+{ews_desc}
+
+Provide your analysis in EXACTLY this JSON format (no markdown, no code fences):
+{{
+  "summary": "A 2-3 sentence executive summary of the credit profile and your key finding.",
+  "strengths": ["strength 1 with specific data", "strength 2", "strength 3"],
+  "concerns": ["concern 1 with specific data", "concern 2", "concern 3"],
+  "suggestions": ["actionable suggestion 1 for the borrower", "suggestion 2", "suggestion 3", "suggestion 4"],
+  "risk_verdict": "A single sentence final risk opinion, e.g. MODERATE RISK — Acceptable with conditions.",
+  "monitoring_actions": ["specific monitoring action 1", "action 2", "action 3"]
+}}
+
+Use specific numbers from the data. Be analytical, not generic. Each suggestion must be actionable and specific to THIS borrower's situation."""
+
+        if settings.GROQ_API_KEY:
+            try:
+                return await self._call_groq_analysis(prompt)
+            except Exception as e:
+                logger.error(f"LLM AI analysis failed: {e}")
+
+        # Fallback: build a structured analysis from the computed data
+        return self._build_fallback_analysis(features, score_result, shap_top, ews_red, ews_amber, radar)
+
+    async def _call_groq_analysis(self, prompt: str) -> dict:
+        """Call Groq LLM for AI analysis."""
+        import json
+        from groq import AsyncGroq
+
+        client = AsyncGroq(api_key=settings.GROQ_API_KEY)
+        response = await client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=1500,
+            temperature=0.3,
+            messages=[
+                {"role": "system", "content": "You are a Senior Credit Analyst. Respond ONLY with valid JSON. No markdown, no code fences, no extra text."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        raw = response.choices[0].message.content.strip()
+        # Strip code fences if present
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+        if raw.endswith("```"):
+            raw = raw[:-3]
+        raw = raw.strip()
+        return json.loads(raw)
+
+    @staticmethod
+    def _build_fallback_analysis(features: dict, score_result, shap_top: list, ews_red: list, ews_amber: list, radar: dict) -> dict:
+        """Build structured analysis without LLM from computed data."""
+        strengths = []
+        concerns = []
+        suggestions = []
+
+        dscr = features.get("dscr", 0)
+        de = features.get("debt_equity_ratio", 0)
+        cr = features.get("current_ratio", 0)
+        altman = features.get("altman_z_score", 0)
+        cibil = features.get("cibil_score", 0)
+
+        if dscr >= 1.5:
+            strengths.append(f"Strong debt servicing capacity with DSCR at {dscr:.2f}x, well above the 1.2x minimum covenant threshold")
+        elif dscr < 1.2:
+            concerns.append(f"Debt servicing concern — DSCR at {dscr:.2f}x is below the minimum 1.2x threshold")
+            suggestions.append(f"Improve DSCR from {dscr:.2f}x to above 1.5x by reducing debt or increasing operating cash flows")
+
+        if de < 2.0:
+            strengths.append(f"Conservative leverage with D/E ratio at {de:.2f}x, providing comfortable headroom below the 3.0x threshold")
+        elif de > 3.0:
+            concerns.append(f"Elevated leverage — D/E ratio at {de:.2f}x exceeds the 3.0x prudential threshold")
+            suggestions.append(f"Reduce D/E ratio from {de:.2f}x by retiring high-cost debt or injecting fresh equity of ₹{(de - 2.0) * 10:.0f}Cr")
+
+        if altman > 2.9:
+            strengths.append(f"Altman Z-Score of {altman:.2f} places the company in the Safe Zone, indicating low default probability")
+        elif altman < 1.23:
+            concerns.append(f"Altman Z-Score of {altman:.2f} indicates Distress Zone — elevated insolvency risk")
+
+        if cibil >= 750:
+            strengths.append(f"Excellent credit bureau profile with CIBIL score of {cibil:.0f}")
+        elif cibil < 650:
+            concerns.append(f"Below-average CIBIL score of {cibil:.0f} indicates past repayment irregularities")
+            suggestions.append("Improve CIBIL score by ensuring timely repayment of all existing facilities for the next 6-12 months")
+
+        if cr >= 1.5:
+            strengths.append(f"Healthy liquidity position with current ratio at {cr:.2f}x")
+
+        for e in ews_red:
+            concerns.append(f"{e['description']}")
+        for e in ews_amber[:2]:
+            concerns.append(f"{e['description']}")
+
+        if not suggestions:
+            suggestions.append("Maintain current financial discipline and focus on improving operating margins")
+        suggestions.append("Submit quarterly financial statements to enable continuous monitoring")
+        suggestions.append("Consider obtaining an external credit rating to improve market credibility and reduce borrowing costs")
+
+        decision = score_result.decision
+        pd = score_result.pd_score
+        grade = score_result.credit_grade
+        risk_level = "LOW" if pd < 0.05 else "MODERATE" if pd < 0.15 else "HIGH"
+
+        return {
+            "summary": f"The ML ensemble model assigns a credit grade of {grade} with PD of {pd:.4f} ({pd*100:.2f}%), "
+                       f"resulting in a {decision} decision with {score_result.confidence:.0%} confidence. "
+                       f"{'The financial profile demonstrates adequate debt servicing capability and manageable leverage.' if decision != 'DECLINE' else 'Multiple risk indicators exceed prudential thresholds, warranting elevated caution.'}",
+            "strengths": strengths[:4] if strengths else ["No significant strengths identified relative to risk thresholds"],
+            "concerns": concerns[:4] if concerns else ["No material concerns identified — credit profile within acceptable parameters"],
+            "suggestions": suggestions[:5],
+            "risk_verdict": f"{risk_level} RISK — {'Recommended for approval' if decision == 'APPROVE' else 'Conditional approval subject to covenant compliance' if decision == 'CONDITIONAL' else 'Declined — risk indicators exceed acceptable thresholds'}.",
+            "monitoring_actions": [
+                "Quarterly DSCR and D/E covenant compliance check",
+                "Monthly CIBIL monitoring for new defaults or DPD entries",
+                f"Annual review with fresh financial spreads — next due in 12 months",
+            ],
+        }
 
     def generate_ews(self, features: dict, spreads: list) -> List[dict]:
         """Check 15 Early Warning Signal trigger conditions."""

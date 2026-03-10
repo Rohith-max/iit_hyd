@@ -10,8 +10,11 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "*"
 
     # AI
-    ANTHROPIC_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
     TAVILY_API_KEY: str = ""
+
+    # Auth
+    GOOGLE_CLIENT_ID: str = ""
 
     # Financial Data
     ALPHA_VANTAGE_API_KEY: str = ""

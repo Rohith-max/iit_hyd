@@ -125,16 +125,16 @@ class WebResearchAgent:
             return self._mock_search_results()
 
     async def analyze_news_sentiment(self, articles: List[dict]) -> dict:
-        """Analyze news sentiment using Claude or heuristics."""
-        if settings.DEMO_MODE or not settings.ANTHROPIC_API_KEY:
+        """Analyze news sentiment using Groq LLM or heuristics."""
+        if settings.DEMO_MODE or not settings.GROQ_API_KEY:
             return self._mock_sentiment()
 
         try:
-            import anthropic
-            client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+            from groq import Groq
+            client = Groq(api_key=settings.GROQ_API_KEY)
             articles_text = "\n".join([f"- {a['title']}: {a['content'][:200]}" for a in articles[:10]])
-            response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+            response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
                 max_tokens=500,
                 messages=[{
                     "role": "user",
@@ -148,7 +148,7 @@ Articles:
                 }]
             )
             import json
-            text = response.content[0].text
+            text = response.choices[0].message.content
             # Try to extract JSON
             start = text.find("{")
             end = text.rfind("}") + 1

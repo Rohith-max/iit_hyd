@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///test.db")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
+os.environ.setdefault("GROQ_API_KEY", "test-key")
 os.environ.setdefault("DUCKDB_PATH", "./data/test_nexus.duckdb")
 os.environ.setdefault("DEMO_MODE", "true")
 

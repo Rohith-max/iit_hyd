@@ -53,6 +53,11 @@ async def create_case(req: CaseCreateRequest):
         "requested_amount": req.requested_amount,
         "requested_tenure_months": req.requested_tenure_months,
         "purpose": req.purpose,
+        "collateral_data": {
+            "collateral_type": req.collateral_type or "immovable_property",
+            "collateral_value": req.collateral_value or 0,
+            "collateral_description": req.collateral_description or "",
+        } if req.collateral_type or req.collateral_value else {},
         "status": "INTAKE",
         "priority": "NORMAL",
         "created_at": now,
@@ -104,6 +109,7 @@ async def trigger_analysis(case_id: str, background_tasks: BackgroundTasks):
         "requested_amount": case.get("requested_amount", 0),
         "loan_type": case.get("loan_type"),
         "requested_tenure_months": case.get("requested_tenure_months"),
+        "collateral_data": case.get("collateral_data", {}),
     }
 
     background_tasks.add_task(_run_pipeline, case_id, case_data)
@@ -253,6 +259,8 @@ async def get_shap(case_id: str):
     if not scores:
         raise HTTPException(404, "SHAP data not available")
     return {
-        "shap_values": scores.get("shap_values"),
-        "feature_importances": scores.get("feature_importances"),
+        "waterfall_data": scores.get("shap_values", []),
+        "natural_language_summary": scores.get("shap_summary", ""),
+        "risk_radar": scores.get("feature_importances", {}),
+        "ai_analysis": scores.get("ai_analysis"),
     }
