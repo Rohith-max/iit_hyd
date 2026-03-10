@@ -4,7 +4,7 @@ WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
-ARG VITE_GOOGLE_CLIENT_ID=""
+ARG VITE_GOOGLE_CLIENT_ID="95037061991-oc8m7vk0pqk28qn56eriajqraohbaci0.apps.googleusercontent.com"
 ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 RUN npm run build
 
