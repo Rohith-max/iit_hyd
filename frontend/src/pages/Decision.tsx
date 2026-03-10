@@ -5,7 +5,7 @@ import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
   LineChart, Line, Legend,
 } from 'recharts';
-import { CheckCircle, XCircle, AlertTriangle, Download, FileText, ArrowLeft, TrendingUp, TrendingDown } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, Download, FileText, ArrowLeft, TrendingUp, TrendingDown, Brain, Shield, Lightbulb, Eye } from 'lucide-react';
 import { fetchDecision, fetchSHAP, fetchCase, downloadCAMPDF } from '../lib/api';
 import clsx from 'clsx';
 
@@ -229,8 +229,121 @@ export default function Decision() {
         </div>
       )}
 
-      {/* SHAP Summary */}
-      {shapData?.natural_language_summary && (
+      {/* AI Analysis */}
+      {shapData?.ai_analysis && (
+        <div className="rounded-xl border border-nexus-cyan/20 bg-nexus-dark-card overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center gap-3 border-b border-nexus-cyan/10 bg-nexus-cyan/[0.03] px-6 py-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-nexus-cyan/10 border border-nexus-cyan/20">
+              <Brain size={16} className="text-nexus-cyan" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-white">AI Credit Analysis</h3>
+              <p className="text-[10px] text-white/30 uppercase tracking-wider">Powered by LLM • Based on ML scores, SHAP, financials & EWS</p>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-6">
+            {/* Summary */}
+            <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
+              <p className="text-sm text-white/70 leading-relaxed">{shapData.ai_analysis.summary}</p>
+            </div>
+
+            {/* Risk Verdict */}
+            {shapData.ai_analysis.risk_verdict && (
+              <div className={clsx(
+                'rounded-lg border px-4 py-3 flex items-center gap-3',
+                isApprove ? 'border-nexus-green/20 bg-nexus-green/5' :
+                isDecline ? 'border-nexus-red/20 bg-nexus-red/5' :
+                'border-nexus-amber/20 bg-nexus-amber/5',
+              )}>
+                <Shield size={16} className={isApprove ? 'text-nexus-green' : isDecline ? 'text-nexus-red' : 'text-nexus-amber'} />
+                <span className={clsx('text-sm font-semibold', isApprove ? 'text-nexus-green' : isDecline ? 'text-nexus-red' : 'text-nexus-amber')}>
+                  {shapData.ai_analysis.risk_verdict}
+                </span>
+              </div>
+            )}
+
+            {/* Strengths & Concerns Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Strengths */}
+              {shapData.ai_analysis.strengths?.length > 0 && (
+                <div className="rounded-lg border border-nexus-green/15 bg-nexus-green/[0.02] p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <TrendingUp size={14} className="text-nexus-green" />
+                    <h4 className="text-xs font-semibold text-nexus-green uppercase tracking-wider">Strengths</h4>
+                  </div>
+                  <ul className="space-y-2">
+                    {shapData.ai_analysis.strengths.map((s: string, i: number) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-nexus-green/60 shrink-0" />
+                        <span className="text-xs text-white/55 leading-relaxed">{s}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Concerns */}
+              {shapData.ai_analysis.concerns?.length > 0 && (
+                <div className="rounded-lg border border-nexus-red/15 bg-nexus-red/[0.02] p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <TrendingDown size={14} className="text-nexus-red" />
+                    <h4 className="text-xs font-semibold text-nexus-red uppercase tracking-wider">Concerns</h4>
+                  </div>
+                  <ul className="space-y-2">
+                    {shapData.ai_analysis.concerns.map((c: string, i: number) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-nexus-red/60 shrink-0" />
+                        <span className="text-xs text-white/55 leading-relaxed">{c}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Suggestions */}
+            {shapData.ai_analysis.suggestions?.length > 0 && (
+              <div className="rounded-lg border border-nexus-amber/15 bg-nexus-amber/[0.02] p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Lightbulb size={14} className="text-nexus-amber" />
+                  <h4 className="text-xs font-semibold text-nexus-amber uppercase tracking-wider">Actionable Suggestions</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {shapData.ai_analysis.suggestions.map((s: string, i: number) => (
+                    <div key={i} className="flex items-start gap-2 rounded-md bg-white/[0.02] px-3 py-2">
+                      <span className="text-nexus-amber text-xs font-bold mt-0.5">{i + 1}.</span>
+                      <span className="text-xs text-white/55 leading-relaxed">{s}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Monitoring Actions */}
+            {shapData.ai_analysis.monitoring_actions?.length > 0 && (
+              <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Eye size={14} className="text-nexus-cyan" />
+                  <h4 className="text-xs font-semibold text-nexus-cyan uppercase tracking-wider">Monitoring Actions</h4>
+                </div>
+                <ul className="space-y-1.5">
+                  {shapData.ai_analysis.monitoring_actions.map((m: string, i: number) => (
+                    <li key={i} className="flex items-center gap-2">
+                      <span className="h-1 w-1 rounded-full bg-nexus-cyan/50" />
+                      <span className="text-xs text-white/45">{m}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* SHAP Summary fallback (when no ai_analysis) */}
+      {!shapData?.ai_analysis && shapData?.natural_language_summary && (
         <div className="rounded-xl border border-nexus-dark-border bg-nexus-dark-card p-6">
           <h3 className="text-sm font-semibold mb-3">AI Explanation</h3>
           <p className="text-sm text-white/60 leading-relaxed">{shapData.natural_language_summary}</p>

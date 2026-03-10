@@ -6,7 +6,13 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 try:
-    engine = create_async_engine(settings.DATABASE_URL, echo=False, pool_size=20, max_overflow=10)
+    _connect_args = {}
+    _engine_kwargs = {"echo": False}
+    if settings.DATABASE_URL.startswith("sqlite"):
+        _connect_args = {"check_same_thread": False}
+    else:
+        _engine_kwargs.update({"pool_size": 20, "max_overflow": 10})
+    engine = create_async_engine(settings.DATABASE_URL, connect_args=_connect_args, **_engine_kwargs)
     AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 except Exception as e:
     logger.warning(f"Database engine creation failed (running without DB): {e}")

@@ -39,6 +39,9 @@ markdown==3.7
 # Task Queue
 redis==5.1.0
 
+# SQLite async
+aiosqlite==0.20.0
+
 # WebSocket
 websockets==13.0
 

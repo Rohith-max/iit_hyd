@@ -3,6 +3,28 @@ import type { CreditCase, MLScore, EarlyWarningSignal, SHAPExplanation, Dashboar
 
 const api = axios.create({ baseURL: '/api/v1' });
 
+// Attach JWT token to every request
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('nexus_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Redirect to login on 401
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('nexus_token');
+      localStorage.removeItem('nexus_user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(err);
+  },
+);
+
 export async function fetchDashboardStats(): Promise<DashboardStats> {
   const { data } = await api.get('/dashboard/stats');
   return data;
@@ -67,3 +89,5 @@ export async function fetchDemoMetrics() {
   const { data } = await api.get('/demo/metrics');
   return data;
 }
+
+export default api;

@@ -17,9 +17,13 @@ services:
         value: "true"
       - key: DUCKDB_PATH
         value: "./data/nexus_demo.duckdb"
-      - key: ANTHROPIC_API_KEY
+      - key: GROQ_API_KEY
         sync: false
       - key: TAVILY_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: VITE_GOOGLE_CLIENT_ID
         sync: false
       - key: DATABASE_URL
         value: "sqlite+aiosqlite:///./data/nexus.db"

@@ -1,6 +1,7 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FileInput, Activity, Bell } from 'lucide-react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, FileInput, Bell, LogOut } from 'lucide-react';
 import clsx from 'clsx';
+import { useAuthStore } from '../store/auth';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -9,6 +10,14 @@ const navItems = [
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <div className="min-h-screen bg-nexus-dark-bg text-white">
@@ -48,9 +57,26 @@ export default function Layout() {
               <Bell size={18} />
               <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-nexus-cyan" />
             </button>
-            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-nexus-cyan/30 to-nexus-cyan/10 border border-nexus-cyan/20 flex items-center justify-center">
-              <span className="text-xs font-semibold text-nexus-cyan">A</span>
-            </div>
+
+            {user && (
+              <div className="flex items-center gap-3">
+                {user.picture ? (
+                  <img src={user.picture} alt="" className="h-8 w-8 rounded-full border border-white/10" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-nexus-cyan/30 to-nexus-cyan/10 border border-nexus-cyan/20 flex items-center justify-center">
+                    <span className="text-xs font-semibold text-nexus-cyan">{user.name[0]?.toUpperCase()}</span>
+                  </div>
+                )}
+                <span className="text-sm text-white/60 hidden sm:block">{user.name.split(' ')[0]}</span>
+                <button
+                  onClick={handleLogout}
+                  className="text-white/30 hover:text-white/70 transition-colors"
+                  title="Sign out"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </nav>

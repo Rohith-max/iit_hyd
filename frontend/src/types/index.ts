@@ -47,10 +47,20 @@ export interface SHAPFeature {
   direction: 'positive' | 'negative';
 }
 
+export interface AIAnalysis {
+  summary: string;
+  strengths: string[];
+  concerns: string[];
+  suggestions: string[];
+  risk_verdict: string;
+  monitoring_actions: string[];
+}
+
 export interface SHAPExplanation {
   waterfall_data: SHAPFeature[];
   natural_language_summary: string;
   risk_radar: Record<string, number>;
+  ai_analysis?: AIAnalysis;
 }
 
 export interface AgentEvent {
